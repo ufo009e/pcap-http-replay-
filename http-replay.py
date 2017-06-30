@@ -1,4 +1,4 @@
-# Written by Beann.wu@hotmail.com
+# Written by ENE Bean Wu bean.wu@f5.com
 
 """
 This script is used for replaying http response from pcap file. Only supports GET and POST. It has 3 mode:
@@ -98,6 +98,13 @@ post_data_check = args.postdacacheck
 #parse tshark output file, generate 4 dictionary: request url, post data, hex request and hex reply. All use request frame number as key.
 print "\n========================================"
 logging.warning( " loading HTTP request and response " )
+
+#checking if previously replayed 
+if os.path.isfile('replay_tmp.txt') == False:
+	print "!!!!! first time replay? No previous file found, Please use -f option"
+	os._exit(0)
+
+
 with open('replay_tmp.txt') as fp:
     for line in fp:
         if "Frame" in line:
