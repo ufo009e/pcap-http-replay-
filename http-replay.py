@@ -1,4 +1,4 @@
-# Written by ENE Bean Wu bean.wu@f5.com
+# Written by beann.wu@hotmail.com
 
 """
 This script is used for replaying http response from pcap file. Only supports GET and POST. It has 3 mode:
