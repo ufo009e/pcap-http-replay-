@@ -131,6 +131,8 @@ with open('replay_tmp.txt') as fp:
 for k in sorted(reply.keys(),key=int):
 	if request[k] != "":
 		match = re.search(r'(47455420|504f535420).*',request[k])
+		if match is None:
+			continue
 		request_payload = match.group().replace('\s', '')
 		request_raw = binascii.unhexlify(request_payload)
 		match = re.search(r'\s.+?\s',request_raw)
