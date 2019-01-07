@@ -1,4 +1,4 @@
-This script is used for replaying http response from pcap file. Only supports GET and POST. It has 3 mode:
+This script is used for replaying http response from pcap file. It has 3 mode:
 
 1. hex mode (when args -u = 0 and -d = 0), only return matched replay when received http request (header and content) is exactly same as request in pcap file.
 
