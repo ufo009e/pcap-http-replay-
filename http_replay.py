@@ -72,6 +72,7 @@ parser.add_argument("-d", "--postdacacheck", type=str, choices=["0", "1"], help=
 parser.add_argument("-l", "--listenport", type=int, help="set local port this script listnes on, example: -p 80 default is 80", default="80")
 parser.add_argument("-i", "--ignore", type=str, help="ignore request matching for specified request frame number in pcap, example: -i 20,25 ")
 parser.add_argument("-r", "--replace_redirect", type=str, help="strip hostname in redirect Location header, enable=1, default is 1", default="1")
+
 args = parser.parse_args()
 #set tshark command
 if args.pcapfile !=  None:
@@ -101,8 +102,7 @@ post_data_check = args.postdacacheck
 global cookie_check_keyword
 cookie_check_keyword = 'TS'
 
-
-#parse tshark output file, generate 4 dictionary: request url, post data, hex request and hex reply. All use request frame number as key.
+#parse tshark output file, generate dictionary All use request frame number as key.
 print "\n========================================"
 logging.warning( " loading HTTP request and response " )
 
@@ -158,7 +158,7 @@ for k in sorted(reply.keys(),key=int):
 
 		match = re.search(r'\w+\s',request_raw)
 		method = match.group().replace('\s', '')
-		
+		urlmatch[k] = method + ":" + urlmatch[k]
 		match = re.search(r'Cookie:.+?\r\n',request_raw)
 		if match:
 			cookiematch[k] = match.group()
@@ -169,12 +169,11 @@ for k in sorted(reply.keys(),key=int):
 		if "POST" in method or "PATCH" in method or "PUT" in method:
 			match = re.search(r'\n.+$',request_raw)
 			postdata[k] = method + ':' + match.group().replace('\n', '')
-			print "request_frame: " + k + " method: " + method + " url: " + urlmatch[k]  + " postdata: " + postdata[k] + " " + cookiematch[k]
+			print "Request_frame: " + k + " " + urlmatch[k]  + " postdata: " + postdata[k] + " " + cookiematch[k]
 		else:
-			print "request_frame: " + k + " method: " + method + " url: " + urlmatch[k] + " " + cookiematch[k]
+			print "Request_frame: " + k + " " + urlmatch[k] + " " + cookiematch[k]
 
 def find_responese(receive_method,post_data_check,postdata,request,reply,k,receive_url,receive_data):
-#	match_flag = "1"
 	if "POST" in receive_method or "PATCH" in receive_method or "PUT" in receive_method:
 		time.sleep(0.3)
 		if k in postdata.keys():
@@ -182,7 +181,6 @@ def find_responese(receive_method,post_data_check,postdata,request,reply,k,recei
 				if receive_method + ':' + receive_data == postdata[k]:
 					if k in reply.keys():
 						response = ''.join(re.findall("485454502f.*", reply[k]))
-						#self.request.sendall(binascii.unhexlify(response))
 						logging.warning( " Send >>>>>>> Found matched replay in request_frame " + k  + " method " + receive_method  + "receive_url " + receive_url +  "received data" + receive_data + " with POST data check")
 						match_flag = "1"
 						return binascii.unhexlify(response),match_flag
@@ -195,12 +193,10 @@ def find_responese(receive_method,post_data_check,postdata,request,reply,k,recei
 				if k in reply.keys():
 					logging.warning( " Send >>>>>>> Found matched replay in request_frame " + k  + " method " + receive_method  + "receive_url " + receive_url +  "received data" + receive_data + " WITHOUT POST data check")
 					response = ''.join(re.findall("485454502f.*", reply[k]))
-					#self.request.sendall(binascii.unhexlify(response))
 					match_flag = "1"
 					return binascii.unhexlify(response),match_flag
 				else:
-					return 'Nomatch_continue_ASDFGHJ','0'
-					
+					return 'Nomatch_continue_ASDFGHJ','0'					
 		else:
 			return 'Nomatch_continue_ASDFGHJ','0'
 	else:
@@ -213,8 +209,7 @@ def find_responese(receive_method,post_data_check,postdata,request,reply,k,recei
 				#self.request.sendall(binascii.unhexlify(response))
 				logging.warning( " Send >>>>>>> Found matched replay in request_frame " + k  + " method " + receive_method  + "receive_url " + receive_url)
 				match_flag = "1"
-				return binascii.unhexlify(response),match_flag
-				
+				return binascii.unhexlify(response),match_flag				
 			else: 
 				logging.warning( " Receive <<<<<<<<< method " + receive_method + " receive_url " + receive_url )
 				#self.request.sendall('HTTP/1.1 200 OK\r\nContent-Length: 35\r\nContent-Type: text/plain\r\n\r\nNo matched replay for this request\n')
@@ -226,6 +221,7 @@ class MySockServer(SocketServer.BaseRequestHandler):
 	def handle(self):
 		try:		
 			while 1:
+				#sleep to avoid cpu spike
 				time.sleep(0.1)
 				receive = self.request.recv(4096)
 				sent_flag = '0'
@@ -263,15 +259,12 @@ class MySockServer(SocketServer.BaseRequestHandler):
 							receive_data = ''
 						#print 'check order ' + str(check_order)
 						for k in check_order:
-							if receive_url == urlmatch[k]:
+							if receive_method + ":" + receive_url == urlmatch[k]:
 		
 								response, match_flag = find_responese(receive_method,post_data_check,postdata,request,reply,k,receive_url,receive_data)
 								if 'Nomatch_continue_ASDFGHJ' in response:
 									continue
 								else:
-									#print response
-									#print args.replace_redirect
-									#print type(args.replace_redirect)
 									if not args.replace_redirect == '1':
 										self.request.sendall(response)
 									else:
