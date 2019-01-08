@@ -1,4 +1,4 @@
-# Written by ENE Bean Wu
+# Written by beann.wu@hotmail.com
 
 """
 This script is used for replaying http response from pcap file. It has 3 mode:
@@ -219,8 +219,8 @@ def find_responese(receive_method,post_data_check,postdata,request,reply,k,recei
 	
 class MySockServer(SocketServer.BaseRequestHandler):
 	def handle(self):
-		try:		
-			while 1:
+		while 1:
+			try:	
 				#sleep to avoid cpu spike
 				time.sleep(0.1)
 				receive = self.request.recv(4096)
@@ -234,10 +234,10 @@ class MySockServer(SocketServer.BaseRequestHandler):
 							logging.warning( " Receive <<<<<<<<< No http url, maybe a request splited in multiple packets." )
 							continue
 						receive_url = receive_match.group().replace('\s', '')
-		
+			
 						receive_match = re.search(r'\w+\s',receive)
 						receive_method = receive_match.group().replace('\s', '')
-	
+		
 						match = re.search(r'Cookie:.+?\r\n',receive)
 						cookie_match_flag = '0'
 						check_order = nocookielist + hascookielist
@@ -260,7 +260,7 @@ class MySockServer(SocketServer.BaseRequestHandler):
 						#print 'check order ' + str(check_order)
 						for k in check_order:
 							if receive_method + ":" + receive_url == urlmatch[k]:
-		
+			
 								response, match_flag = find_responese(receive_method,post_data_check,postdata,request,reply,k,receive_url,receive_data)
 								if 'Nomatch_continue_ASDFGHJ' in response:
 									continue
@@ -271,7 +271,7 @@ class MySockServer(SocketServer.BaseRequestHandler):
 										self.request.sendall(re.sub(r'Location: (http|https)://.*?/','Location: /', response))
 									sent_flag = '1'
 									break
-	
+		
 						if match_flag == "0":
 							logging.warning( " Receive <<<<<<<<< method " + receive_method + " receive_url " + receive_url )
 							self.request.sendall('HTTP/1.1 200 OK\r\nContent-Length: 35\r\nContent-Type: text/plain\r\n\r\nNo matched replay for this request\n')
@@ -295,11 +295,8 @@ class MySockServer(SocketServer.BaseRequestHandler):
 							logging.warning( " Receive <<<<<<<<< method " + receive_method + " receive_url " + receive_url )
 							self.request.sendall('HTTP/1.1 200 OK\r\nContent-Length: 35\r\nContent-Type: text/plain\r\n\r\nNo matched replay for this request\n')
 							logging.warning( " Send >>>>>>> No matched")
-		except KeyboardInterrupt:
-			print "\nSee you next time ......"
-			server.shutdown()
-			server.server_close()
-			os._exit(0)
+			except socket.error, (value, message):
+				logging.warning( message )
 							
 if __name__ == "__main__":		
 	#create socket to receive and send data
