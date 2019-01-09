@@ -1,4 +1,4 @@
-# Written by beann.wu@hotmail.com
+# Written by ENE Bean Wu
 
 """
 This script is used for replaying http response from pcap file. It has 3 mode:
@@ -59,6 +59,7 @@ import binascii
 import argparse
 import logging
 import time
+from collections import defaultdict
 logging.basicConfig(format='%(asctime)s %(message)s')
 
 #set args
@@ -72,6 +73,7 @@ parser.add_argument("-d", "--postdacacheck", type=str, choices=["0", "1"], help=
 parser.add_argument("-l", "--listenport", type=int, help="set local port this script listnes on, example: -p 80 default is 80", default="80")
 parser.add_argument("-i", "--ignore", type=str, help="ignore request matching for specified request frame number in pcap, example: -i 20,25 ")
 parser.add_argument("-r", "--replace_redirect", type=str, help="strip hostname in redirect Location header, enable=1, default is 1", default="1")
+parser.add_argument("-o", "--follow_order", type=str, help="try to replay the response follow the same order of pcap. It could be useful when you have same request with different response, enable=1, default is 0", default="0")
 
 args = parser.parse_args()
 #set tshark command
@@ -173,6 +175,20 @@ for k in sorted(reply.keys(),key=int):
 		else:
 			print "Request_frame: " + k + " " + urlmatch[k] + " " + cookiematch[k]
 
+#found dupliate uri
+dupuri_frame = defaultdict(list)
+vals = urlmatch.values()
+for key, value in urlmatch.items():
+   if vals.count(value) > 1:
+		dupuri_frame[value].append(key)
+del_after_use = []
+for i in dupuri_frame:
+	dupuri_frame[i].sort(key=int)
+	del dupuri_frame[i][-1]
+	del_after_use = del_after_use + dupuri_frame[i]
+if args.follow_order == '1':
+	print "!!! follow order is enabled, following frame will be removed after use: " + str(del_after_use)
+
 def find_responese(receive_method,post_data_check,postdata,request,reply,k,receive_url,receive_data):
 	if "POST" in receive_method or "PATCH" in receive_method or "PUT" in receive_method:
 		time.sleep(0.3)
@@ -259,19 +275,25 @@ class MySockServer(SocketServer.BaseRequestHandler):
 							receive_data = ''
 						#print 'check order ' + str(check_order)
 						for k in check_order:
-							if receive_method + ":" + receive_url == urlmatch[k]:
-			
+							if receive_method + ":" + receive_url == urlmatch[k]:			
 								response, match_flag = find_responese(receive_method,post_data_check,postdata,request,reply,k,receive_url,receive_data)
 								if 'Nomatch_continue_ASDFGHJ' in response:
 									continue
 								else:
 									if not args.replace_redirect == '1':
-										self.request.sendall(response)
+										self.request.sendall(response)										
 									else:
 										self.request.sendall(re.sub(r'Location: (http|https)://.*?/','Location: /', response))
+									#print "args.follow_order " + args.follow_order
+									if args.follow_order == '1':
+										if k in del_after_use:
+											if k in hascookielist:
+												hascookielist.remove(k)
+											else:
+												nocookielist.remove(k)
+											logging.warning( " !!! Removed frame " + k + " from url list, as follow order is enabled and " + k + " has been used. Each duplicate uri always keep last one. Restart this script if you need to simulate the entire process again" )
 									sent_flag = '1'
-									break
-		
+									break		
 						if match_flag == "0":
 							logging.warning( " Receive <<<<<<<<< method " + receive_method + " receive_url " + receive_url )
 							self.request.sendall('HTTP/1.1 200 OK\r\nContent-Length: 35\r\nContent-Type: text/plain\r\n\r\nNo matched replay for this request\n')
